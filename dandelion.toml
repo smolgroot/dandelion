@@ -21,3 +21,6 @@ decoy_wallets = 20
 max_concurrent_transactions = 5
 retry_attempts = 3
 retry_delay_ms = 1000
+
+[logging]
+log_level = "error"

@@ -53,16 +53,21 @@ async fn generate_wallets(seed: &str, count: usize) -> Result<()> {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     
-    // Initialize logging
-    let log_level = if cli.verbose { "debug" } else { "info" };
+    // Load configuration first to get log level
+    let config = DandelionConfig::load_or_default()?;
+    
+    // Initialize logging with config or CLI override
+    let log_level = if cli.verbose { 
+        "debug" 
+    } else { 
+        &config.logging.log_level 
+    };
+    
     tracing_subscriber::fmt()
         .with_env_filter(log_level)
         .init();
     
     info!(" Dandelion - Steganographic File Distributor");
-    
-    // Load configuration
-    let config = DandelionConfig::load_or_default()?;
     
     // Override config with CLI parameters
     let (rpc_url, chain_id) = if let Some(url) = cli.rpc_url {
