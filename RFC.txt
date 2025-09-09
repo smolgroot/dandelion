@@ -1,0 +1,621 @@
+RFC: Dandelion Steganographic File Distribution Protocol (DSFP)
+====================================================================
+
+Request for Comments: 001
+Category: Informational
+Authors: Dandelion Development Team
+Date: September 2025
+Title: Dandelion Steganographic File Distribution Protocol (DSFP v1.0)
+
+ABSTRACT
+========
+
+This document describes the Dandelion Steganographic File Distribution Protocol (DSFP), 
+a novel approach to secure file distribution using blockchain transactions as a steganographic 
+medium. The protocol combines AES-256-GCM encryption with transaction-based steganography 
+to enable undetectable file distribution across Ethereum Virtual Machine (EVM) compatible 
+blockchain networks.
+
+1. INTRODUCTION
+===============
+
+The Dandelion protocol addresses the need for secure, censorship-resistant file distribution 
+in environments where traditional file sharing methods may be monitored, blocked, or compromised. 
+By leveraging blockchain transactions as a steganographic carrier medium, DSFP enables the 
+covert transmission of encrypted files with plausible deniability.
+
+Key innovations:
+- Variable-size chunk encoding within transaction metadata
+- Multi-layer steganographic obfuscation 
+- Deterministic wallet derivation with automatic funding
+- Decoy transaction generation for traffic analysis resistance
+
+2. TERMINOLOGY
+==============
+
+- Master Seed: A user-provided entropy source for key derivation
+- Passphrase: Additional entropy for encryption key generation
+- Chunk: A variable-size segment of encrypted file data (16-48 bytes)
+- Steganographic Key: Unique identifier for chunk extraction from transactions
+- Manifest: JSON metadata file containing retrieval information
+- Dummy Transaction: Decoy transaction for traffic obfuscation
+- Sequence Hint: Deterministic ordering value for chunk reassembly
+
+3. PROTOCOL OVERVIEW
+====================
+
+                    ┌─────────────────┐
+                    │  Original File  │
+                    └─────────┬───────┘
+                              │
+                    ┌─────────▼───────┐
+                    │ Key Derivation  │◄─── Master Seed + Passphrase
+                    └─────────┬───────┘
+                              │
+                    ┌─────────▼───────┐
+                    │ AES-256-GCM     │
+                    │ Encryption      │
+                    └─────────┬───────┘
+                              │
+                    ┌─────────▼───────┐
+                    │ Variable        │
+                    │ Chunking        │
+                    └─────────┬───────┘
+                              │
+                    ┌─────────▼───────┐
+                    │ Steganographic  │
+                    │ Encoding        │
+                    └─────────┬───────┘
+                              │
+                    ┌─────────▼───────┐
+                    │ Transaction     │
+                    │ Distribution    │
+                    └─────────┬───────┘
+                              │
+                    ┌─────────▼───────┐
+                    │ Manifest        │
+                    │ Generation      │
+                    └─────────────────┘
+
+4. CRYPTOGRAPHIC SPECIFICATIONS
+===============================
+
+4.1 Key Derivation
+------------------
+
+Master Key Generation:
+    master_key = SHA256("DANDELION_STEG_V1" || user_seed)
+
+Encryption Key Derivation:
+    encryption_key = SHA256(master_key || passphrase || "ENCRYPTION")
+
+Integrity Key Derivation:
+    integrity_key = SHA256(master_key || passphrase || "INTEGRITY")
+
+Steganographic Key Derivation (per chunk):
+    steg_key[i] = SHA256(master_key || passphrase || i || "STEG_KEY")[0:16]
+
+Sequence Hint Generation (per chunk):
+    sequence_hint[i] = LE64(SHA256(master_key || passphrase || i || "SEQUENCE")[0:8])
+
+4.2 File Encryption
+-------------------
+
+Algorithm: AES-256-GCM
+Key Size: 256 bits (32 bytes)
+Nonce Size: 96 bits (12 bytes)
+Authentication Tag: 128 bits (16 bytes)
+
+Encryption Process:
+1. Generate cryptographically secure random nonce (12 bytes)
+2. Encrypt file data using AES-256-GCM with derived encryption key
+3. Combine nonce + ciphertext + auth_tag for storage
+4. Calculate file-level HMAC-SHA256 using integrity key
+
+Combined Encrypted Data Format:
+    [nonce:12][ciphertext:variable][auth_tag:16]
+
+4.3 Integrity Verification
+--------------------------
+
+File-Level Integrity:
+    file_hmac = HMAC-SHA256(integrity_key, original_file_data)
+
+Chunk-Level Integrity:
+    chunk_hmac[i] = HMAC-SHA256(integrity_key, i || chunk_data[i])
+
+Checksum Generation:
+    chunk_checksum[i] = SHA256(chunk_data[i])[0:4]
+
+5. CHUNKING ALGORITHM
+=====================
+
+The variable chunking algorithm prevents pattern analysis by using adaptive chunk sizes 
+and introducing entropy into the data distribution process.
+
+5.1 Chunk Size Determination
+----------------------------
+
+Default chunk size range: 16-48 bytes
+Random number generator: ChaCha20 (seeded with master_key)
+
+For each chunk i:
+    chunk_size[i] = ChaCha20_RNG.gen_range(16, 48)
+    chunk_size[i] = min(chunk_size[i], remaining_data_length)
+
+5.2 Chunk Structure
+-------------------
+
+    struct EncryptedChunk {
+        chunk_id: u16,                  // Sequential identifier (0-65535)
+        total_chunks: u16,              // Total number of chunks in file  
+        data: Vec<u8>,                 // Encrypted chunk data (16-48 bytes)
+        checksum: [u8; 4],             // SHA256 checksum (first 4 bytes)
+        integrity_proof: [u8; 8],      // HMAC-SHA256 proof (first 8 bytes)
+        sequence_hint: u64,             // Deterministic ordering hint
+        steganographic_key: [u8; 16],   // Unique extraction key per chunk
+        master_integrity: [u8; 32],     // File-level HMAC for verification
+    }
+
+6. STEGANOGRAPHIC ENCODING
+==========================
+
+6.1 Transaction Value Steganography
+-----------------------------------
+
+Transaction values encode chunk metadata in the least significant digits while maintaining 
+the appearance of normal micro-transactions.
+
+Value Structure:
+    Base Value: 100,000 - 1,000,000 wei (random)
+    Steganographic Data: Last 4 digits (0000-9999)
+
+Encoding Algorithm:
+    steg_data = (chunk_id << 16) | total_chunks
+    encoded_value = (base_value / 10000) * 10000 + (steg_data % 10000)
+
+Decoding Algorithm:
+    steg_data = transaction_value % 10000
+    chunk_id = steg_data >> 16
+    total_chunks = steg_data & 0xFFFF
+
+6.2 Transaction Input Data Steganography
+----------------------------------------
+
+Transaction input data mimics legitimate smart contract interactions while embedding 
+encrypted chunk data within the payload.
+
+Input Data Structure:
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ Function Selector (4 bytes)    │ Fake ERC-20 transfer signature  │
+    ├─────────────────────────────────────────────────────────────────┤
+    │ Random Padding (32-64 bytes)   │ Realistic parameter data       │
+    ├─────────────────────────────────────────────────────────────────┤
+    │ Chunk Metadata (12 bytes)      │ chunk_id + total_chunks +      │
+    │                                │ sequence_hint                   │
+    ├─────────────────────────────────────────────────────────────────┤
+    │ Encrypted Chunk Data (16-48)   │ Actual encrypted file data     │
+    ├─────────────────────────────────────────────────────────────────┤
+    │ Integrity Components (12)      │ checksum + integrity_proof     │
+    ├─────────────────────────────────────────────────────────────────┤
+    │ Steganographic Key (16)        │ Unique extraction identifier   │
+    ├─────────────────────────────────────────────────────────────────┤
+    │ Trailing Padding (16-32)       │ Random obfuscation data        │
+    └─────────────────────────────────────────────────────────────────┘
+
+Function Selector: 0xa9059cbb (transfer(address,uint256))
+
+Chunk Metadata Encoding:
+    metadata = chunk_id (2) || total_chunks (2) || sequence_hint (8)
+
+6.3 Timing Obfuscation
+----------------------
+
+To prevent timing analysis attacks, transactions are submitted with randomized delays:
+
+Delay Generation:
+    delay_ms = ChaCha20_RNG.gen_range(500, 3000)
+
+Transaction Ordering:
+    1. Submit real chunk transactions with random delays
+    2. Interleave dummy transactions at 65% ratio
+    3. Randomize wallet selection for each transaction
+
+7. WALLET DERIVATION AND MANAGEMENT
+===================================
+
+7.1 Hierarchical Deterministic Wallet Generation
+------------------------------------------------
+
+Base derivation path: m/44'/60'/0'/0/i
+Master seed: SHA256("DANDELION_STEG_V1" || user_seed)
+
+For wallet index i:
+    private_key[i] = derive_key(master_seed, derivation_path + i)
+    public_key[i] = secp256k1_generate_public_key(private_key[i])
+    address[i] = keccak256(public_key[i])[12:32]
+
+7.2 Automatic Funding Protocol
+------------------------------
+
+Master Wallet:
+    master_private_key = derive_key(master_seed, m/44'/60'/0'/0/0)
+
+Funding Process:
+    1. Check master wallet balance
+    2. Calculate required funding (wallet_count * fund_amount)
+    3. Distribute funds to derived wallets sequentially
+    4. Verify funding completion before distribution
+
+Default funding amount: 0.005 ETH per wallet
+Minimum balance threshold: 0.001 ETH per wallet
+
+8. MANIFEST STRUCTURE
+=====================
+
+The manifest file contains all necessary information for file retrieval and is stored 
+as a JSON document.
+
+8.1 Manifest Schema
+-------------------
+
+    {
+        "file_hash": "SHA256 hash of original file",
+        "master_integrity": "File-level HMAC-SHA256 (hex)",
+        "total_chunks": "Number of chunks in file",
+        "chunk_size_range": [16, 48],
+        "retrieval_map": [
+            {
+                "tx_hash": "Blockchain transaction hash",
+                "wallet_address": "Sender wallet address", 
+                "steganographic_key": "Chunk extraction key (hex)",
+                "chunk_metadata": {
+                    "chunk_id": "Sequential chunk identifier",
+                    "sequence_hint": "Ordering hint value",
+                    "checksum": "Chunk checksum (hex)",
+                    "integrity_proof": "Chunk HMAC proof (hex)"
+                }
+            }
+        ],
+        "decoy_transactions": [
+            "List of dummy transaction hashes"
+        ],
+        "network_info": {
+            "chain_id": "EVM chain identifier",
+            "rpc_url": "Blockchain RPC endpoint", 
+            "block_number": "Distribution block number",
+            "timestamp": "Distribution timestamp"
+        }
+    }
+
+9. DECOY TRANSACTION GENERATION
+===============================
+
+To provide traffic analysis resistance, the protocol generates realistic dummy transactions 
+that are indistinguishable from real chunk-carrying transactions.
+
+9.1 Dummy Transaction Properties
+-------------------------------
+
+- Same transaction value range as real transactions
+- Identical input data structure and size distribution
+- Random steganographic keys (not used for extraction)
+- Proper gas limit calculation
+- Realistic timing distribution
+
+9.2 Dummy Content Generation
+---------------------------
+
+- Random chunk data with correct size distribution
+- Valid-looking but unused steganographic keys
+- Proper metadata structure with dummy values
+- Realistic padding and function selectors
+
+Dummy Ratio: 65% (configurable)
+Minimum dummy transactions per distribution: 10
+
+10. RETRIEVAL PROTOCOL
+======================
+
+10.1 Chunk Extraction Process
+-----------------------------
+
+For each transaction in retrieval_map:
+    1. Fetch transaction data from blockchain
+    2. Locate steganographic key in input data
+    3. Extract chunk metadata preceding the key
+    4. Validate metadata against manifest expectations
+    5. Extract encrypted chunk data between metadata and integrity components
+    6. Verify chunk checksum and integrity proof
+
+10.2 File Reconstruction
+------------------------
+
+    1. Sort chunks by sequence_hint values
+    2. Concatenate chunk data in correct order
+    3. Decrypt combined data using derived encryption key
+    4. Verify file-level HMAC against master_integrity
+    5. Return decrypted file data
+
+10.3 Error Handling
+-------------------
+
+- Missing transactions: Retry with exponential backoff
+- Corrupted chunks: Verify integrity and report errors
+- Decryption failures: Validate passphrase and key derivation
+- Network issues: Implement connection retry logic
+
+11. SECURITY CONSIDERATIONS
+===========================
+
+11.1 Cryptographic Security
+---------------------------
+
+- AES-256-GCM provides authenticated encryption with 256-bit security
+- HMAC-SHA256 ensures data integrity and authenticity
+- Secure random nonce generation prevents replay attacks
+- Key derivation follows industry best practices
+
+11.2 Steganographic Security
+---------------------------
+
+- Variable chunking prevents pattern analysis
+- Dummy transactions provide plausible deniability
+- Timing jitter resists correlation attacks
+- Transaction value encoding appears as normal activity
+
+11.3 Operational Security
+------------------------
+
+- Master seed should be stored securely offline
+- Manifest files contain sensitive retrieval information
+- Network traffic should be anonymized (VPN/Tor)
+- Regular wallet rotation prevents address correlation
+
+11.4 Known Limitations
+---------------------
+
+- Large files may exhibit detectable patterns despite obfuscation
+- Manifest compromise exposes file retrieval capability
+- Quantum computers may threaten AES-256 in the future
+- Network analysis may reveal patterns with extensive resources
+
+12. IMPLEMENTATION REQUIREMENTS
+===============================
+
+12.1 Minimum System Requirements
+-------------------------------
+
+- Rust 1.70+ with std library support
+- Tokio async runtime for networking
+- Access to EVM-compatible blockchain RPC endpoint
+- Minimum 100MB available disk space for builds
+
+12.2 Required Dependencies
+-------------------------
+
+- ethers-rs: Ethereum blockchain interaction
+- aes-gcm: Authenticated encryption implementation
+- sha2: SHA-256 hash function implementation
+- hmac: HMAC authentication implementation
+- rand_chacha: ChaCha20 random number generator
+- serde: JSON serialization/deserialization
+
+12.3 Network Compatibility
+--------------------------
+
+Compatible with any EVM-compatible blockchain:
+- Ethereum Mainnet/Testnets
+- Polygon (Matic) Network
+- Base (Coinbase L2)
+- Arbitrum
+- Optimism
+- Binance Smart Chain
+- Custom EVM networks
+
+13. PERFORMANCE CHARACTERISTICS
+===============================
+
+13.1 Throughput Analysis
+-----------------------
+
+File Size     | Chunks | Transactions | Est. Distribution Time
+------------- | ------ | ------------ | ---------------------
+1 KB          | 25-60  | 40-95       | 30-60 seconds
+10 KB         | 250-600| 400-950     | 5-15 minutes  
+100 KB        | 2500+  | 4000+       | 50+ minutes
+1 MB          | 25000+ | 40000+      | 8+ hours
+
+Note: Times vary significantly based on network congestion and gas prices.
+
+13.2 Cost Analysis (Estimated)
+------------------------------
+
+Network       | Gas Price | Cost per KB | Recommended Use
+------------- | --------- | ----------- | ---------------
+Monad Testnet | Free      | $0.00       | Development/Testing
+Polygon       | ~1 gwei   | $0.10-0.50  | Production (affordable)
+Base          | ~0.1 gwei | $0.50-2.00  | Production (fast)
+Ethereum      | ~20 gwei  | $15-50      | High-value only
+
+14. COMPATIBILITY AND VERSIONING
+=================================
+
+14.1 Protocol Versioning
+------------------------
+
+Current Version: DSFP v1.0
+Version Identifier: "DANDELION_STEG_V1"
+
+Future versions will increment the identifier and maintain backward compatibility 
+where possible. Breaking changes will require new version identifiers.
+
+14.2 Manifest Compatibility
+---------------------------
+
+Manifest files include protocol version information to ensure proper decoding.
+Future versions may extend the manifest format while maintaining core compatibility.
+
+15. REFERENCES
+==============
+
+[RFC2119]   Bradner, S., "Key words for use in RFCs to Indicate Requirement Levels"
+[AES]       FIPS-197, "Advanced Encryption Standard (AES)"
+[GCM]       NIST SP 800-38D, "Galois/Counter Mode for the AES"
+[HMAC]      RFC2104, "HMAC: Keyed-Hashing for Message Authentication"
+[SHA256]    FIPS-180-4, "Secure Hash Standard (SHS)"
+[EIP155]    Ethereum Improvement Proposal 155, "Simple replay attack protection"
+[BIP32]     Bitcoin Improvement Proposal 32, "Hierarchical Deterministic Wallets"
+
+16. APPENDIX A: ASCII PROTOCOL DIAGRAMS
+=======================================
+
+16.1 Complete Distribution Flow
+------------------------------
+
+    User Input                 Crypto Engine              Blockchain
+    ────────────────          ─────────────────          ────────────────
+         │                           │                           │
+    [File + Seed + Pass]             │                           │
+         │                           │                           │
+         └──────────────────────────▶│                           │
+                                     │                           │
+                              [Key Derivation]                   │
+                                     │                           │
+                              [AES-256-GCM Encrypt]             │
+                                     │                           │
+                              [Variable Chunking]               │
+                                     │                           │
+                                     ├────────────────┐          │
+                                     │                │          │
+                              [Steg Engine]    [Wallet Gen]      │
+                                     │                │          │
+                              [Tx Generation]         │          │
+                                     │                │          │
+                                     │          [Auto-Fund]──────┤
+                                     │                │          │
+                                     │                └──────────┤
+                                     │                           │
+                              [Tx Distribution]─────────────────▶│
+                                     │                           │
+                              [Manifest Gen]                     │
+                                     │                           │
+         ◀──────────────────────────┘                           │
+         │                                                      │
+    [Manifest File]                                        [Tx Hashes]
+
+16.2 Transaction Structure Visualization
+----------------------------------------
+
+    Transaction Value (Wei):
+    ┌─────────────────┬─────────────────┐
+    │   Base Value    │ Steganographic  │
+    │  (randomized)   │ Data (metadata) │  
+    │   100k-1M wei   │    4 digits     │
+    └─────────────────┴─────────────────┘
+                      └─ chunk_id + total_chunks
+
+    Transaction Input Data:
+    ┌──────┬─────────┬──────────┬────────┬──────────┬─────────┬─────────┐
+    │ Func │ Padding │ Metadata │ Chunk  │ Checksum │ Steg    │ Padding │
+    │ Sel  │ (32-64) │ (12)     │ Data   │ + HMAC   │ Key     │ (16-32) │
+    │ (4)  │         │          │(16-48) │ (12)     │ (16)    │         │
+    └──────┴─────────┴──────────┴────────┴──────────┴─────────┴─────────┘
+     0xa9059cbb      chunk_id    encrypt  integrity  extract   obfusc
+     (transfer)      total_chunks data     proof     key       data
+                     seq_hint
+
+16.3 Chunk Assembly Process
+---------------------------
+
+    Retrieval Phase:
+    
+    Manifest ──┐
+               │    ┌─────────────────┐
+               └───▶│ Transaction     │◄──── Blockchain RPC
+                    │ Hash List       │
+                    └─────────┬───────┘
+                              │
+                    ┌─────────▼───────┐
+                    │ Extract Chunks  │
+                    │ (Steganography) │
+                    └─────────┬───────┘
+                              │
+                    ┌─────────▼───────┐
+                    │ Verify & Sort   │
+                    │ (Sequence Hints)│
+                    └─────────┬───────┘
+                              │
+                    ┌─────────▼───────┐
+                    │ Concatenate     │
+                    │ Chunk Data      │
+                    └─────────┬───────┘
+                              │
+                    ┌─────────▼───────┐
+                    │ AES-256-GCM     │
+                    │ Decryption      │
+                    └─────────┬───────┘
+                              │
+                    ┌─────────▼───────┐
+                    │ Integrity Check │
+                    │ (File HMAC)     │
+                    └─────────┬───────┘
+                              │
+                         Original File
+
+17. APPENDIX B: SECURITY THREAT MODEL
+=====================================
+
+17.1 Threat Classification Matrix
+---------------------------------
+
+    Threat Type          │ Resistance │ Mitigation Strategy
+    ────────────────────────────────────────────────────────────
+    Passive Monitoring   │    HIGH    │ Steganographic encoding
+    Traffic Analysis     │  MEDIUM    │ Dummy transactions + timing jitter
+    Content Analysis     │    HIGH    │ AES-256-GCM encryption
+    Metadata Analysis    │  MEDIUM    │ Variable chunking + decoys
+    Timing Correlation   │  MEDIUM    │ Random delays + transaction mixing
+    Network Mapping      │    LOW     │ Wallet rotation + address diversity
+    Targeted Surveillance│    LOW     │ Manifest protection + OpSec
+    Quantum Attacks      │    NONE    │ Future: Post-quantum cryptography
+
+17.2 Attack Vectors and Countermeasures
+---------------------------------------
+
+    1. Transaction Pattern Analysis
+       Attack: Correlate transaction sizes, timing, and addresses
+       Defense: 65% dummy ratio, variable delays, address rotation
+
+    2. Content Inspection
+       Attack: Deep packet inspection of transaction data
+       Defense: AES-256-GCM encryption, fake contract calls
+
+    3. Blockchain Analysis
+       Attack: Link transactions through on-chain analysis
+       Defense: Multiple wallets, funding obfuscation, decoys
+
+    4. Manifest Compromise
+       Attack: Gain access to retrieval information
+       Defense: Encrypt manifests, secure storage, access controls
+
+18. CONCLUSION
+==============
+
+The Dandelion Steganographic File Distribution Protocol represents a novel approach 
+to secure, censorship-resistant file distribution. By combining military-grade 
+encryption with blockchain steganography, DSFP enables covert file transmission 
+with strong security properties and plausible deniability.
+
+The protocol's multi-layered approach to security, including variable chunking, 
+dummy transactions, and timing obfuscation, provides resistance against various 
+forms of traffic analysis and surveillance. While no system is perfect, DSFP 
+offers a practical solution for secure file distribution in hostile environments.
+
+Future work may include post-quantum cryptographic upgrades, additional 
+steganographic techniques, and enhanced traffic obfuscation methods to maintain 
+security as analysis techniques evolve.
+
+===================================================================
+END OF RFC
+===================================================================
