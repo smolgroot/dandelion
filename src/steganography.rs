@@ -82,20 +82,15 @@ impl SteganographyEngine {
         Ok(encoded_value)
     }
     
-    // Hide chunk data in transaction input with obfuscation
-    fn encode_steganographic_data(&self, 
-        chunk_data: &[u8], 
-        chunk: &EncryptedChunk, 
-        chunk_idx: usize
-    ) -> Result<Bytes> {
+    pub fn encode_chunk_data(&self, chunk_data: &[u8], chunk: &EncryptedChunk) -> Result<Bytes> {
         let mut rng = rand_chacha::ChaCha20Rng::from_seed(self.master_seed);
         
-        // Create fake function call data
-        let fake_function_selector = [0x12, 0x34, 0x56, 0x78]; // Fake function signature
+        // Create realistic-looking contract call data
+        let fake_function_selector = [0xa9, 0x05, 0x9c, 0xbb]; // transfer(address,uint256) selector
         let mut encoded_data = fake_function_selector.to_vec();
         
-        // Add random padding
-        let padding_size = rng.gen_range(32..128);
+        // Add random padding to look like function arguments
+        let padding_size = rng.gen_range(32..64);
         let mut padding = vec![0u8; padding_size];
         rng.fill_bytes(&mut padding);
         encoded_data.extend_from_slice(&padding);
@@ -116,12 +111,16 @@ impl SteganographyEngine {
         encoded_data.extend_from_slice(&chunk.steganographic_key);
         
         // More random padding to obfuscate actual data size
-        let trailing_padding = rng.gen_range(16..64);
+        let trailing_padding = rng.gen_range(16..32);
         let mut trailing = vec![0u8; trailing_padding];
         rng.fill_bytes(&mut trailing);
         encoded_data.extend_from_slice(&trailing);
         
         Ok(Bytes::from(encoded_data))
+    }
+
+    pub fn encode_steganographic_data(&self, chunk_data: &[u8], chunk: &EncryptedChunk, _chunk_idx: usize) -> Result<Bytes> {
+        self.encode_chunk_data(chunk_data, chunk)
     }
     
     pub fn decode_steganographic_value(&self, value: U256) -> Result<(u16, u16)> {

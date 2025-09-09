@@ -8,7 +8,7 @@ Dandelion is a sophisticated tool that enables secure, decentralized file distri
 
 - **🔐 Advanced Encryption**: AES-256-GCM encryption with HMAC integrity verification
 - **🎭 Steganographic Obfuscation**: Hide data within transaction values and input data
-- **🌐 Multi-Network Support**: Works with Polygon, Base, and other EVM-compatible networks
+- **🌐 Multi-Network Support**: Works with Monad, Base, Polygon, and other EVM-compatible networks
 - **🔀 Traffic Obfuscation**: Dummy transactions and variable timing to hide patterns
 - **📦 Variable Chunking**: Non-uniform chunk sizes to obscure file characteristics
 - **🛡️ Integrity Verification**: Multi-layer integrity checks for data authenticity
@@ -29,6 +29,22 @@ cargo build --release
 
 ### Basic Usage
 
+#### Initialize Configuration
+
+```bash
+# Create default configuration file (uses Monad Testnet by default)
+./target/release/dandelion init
+```
+
+#### Check Wallet Funding
+
+```bash
+# Check if wallets have sufficient funding
+./target/release/dandelion check-funding \
+  --seed "your-master-seed-phrase" \
+  --count 10
+```
+
 #### Distribute a File
 
 ```bash
@@ -37,8 +53,8 @@ cargo build --release
   --seed "your-master-seed-phrase" \
   --passphrase "encryption-passphrase" \
   --output manifest.json \
-  --rpc-url https://polygon-rpc.com \
-  --chain-id 137
+  --rpc-url https://testnet-rpc.monad.xyz \
+  --chain-id 10143
 ```
 
 #### Retrieve a File
@@ -69,6 +85,8 @@ export CHAIN_ID="137"
 
 ### Supported Networks
 
+- **Monad Testnet** (Chain ID: 10143) - `https://testnet-rpc.monad.xyz` [Default]
+- **Base Sepolia** (Chain ID: 84532) - `https://sepolia.base.org`
 - **Polygon** (Chain ID: 137) - `https://polygon-rpc.com`
 - **Base** (Chain ID: 8453) - `https://mainnet.base.org`
 - **Custom EVM** - Provide your own RPC URL

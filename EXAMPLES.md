@@ -7,26 +7,39 @@
 echo "This is a secret message that will be distributed across the blockchain!" > secret.txt
 ```
 
-### 2. Distribute the File
+### 2. Initialize Configuration (Optional)
+```bash
+# Create default configuration with Monad Testnet
+./target/release/dandelion init
+```
+
+### 3. Check Wallet Funding
+```bash
+./target/release/dandelion check-funding \
+  --seed "my-super-secret-seed-phrase-2024" \
+  --count 10
+```
+
+### 4. Distribute the File
 ```bash
 ./target/release/dandelion distribute \
   --file secret.txt \
   --seed "my-super-secret-seed-phrase-2024" \
   --passphrase "encryption-password-123" \
   --output distribution-manifest.json \
-  --rpc-url https://polygon-rpc.com \
-  --chain-id 137 \
+  --rpc-url https://testnet-rpc.monad.xyz \
+  --chain-id 10143 \
   --verbose
 ```
 
-### 3. Retrieve the File
+### 5. Retrieve the File
 ```bash
 ./target/release/dandelion retrieve \
   --manifest distribution-manifest.json \
   --seed "my-super-secret-seed-phrase-2024" \
   --passphrase "encryption-password-123" \
   --output retrieved-secret.txt \
-  --rpc-url https://polygon-rpc.com \
+  --rpc-url https://testnet-rpc.monad.xyz \
   --verbose
 ```
 

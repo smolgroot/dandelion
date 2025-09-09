@@ -1,0 +1,23 @@
+[network]
+rpc_url = "https://testnet-rpc.monad.xyz"
+chain_id = 10143
+network_name = "Monad Testnet"
+gas_price_multiplier = 1.1
+confirmation_blocks = 1
+
+[security]
+dummy_transaction_ratio = 0.65
+timing_jitter_ms = [
+    500,
+    3000,
+]
+chunk_size_range = [
+    16,
+    48,
+]
+decoy_wallets = 20
+
+[performance]
+max_concurrent_transactions = 5
+retry_attempts = 3
+retry_delay_ms = 1000

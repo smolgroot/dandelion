@@ -3,6 +3,9 @@ use std::path::PathBuf;
 
 #[derive(Subcommand)]
 pub enum Commands {
+    /// Initialize configuration file
+    Init,
+    
     /// Distribute a file across the blockchain using steganography
     Distribute(DistributeArgs),
     
@@ -12,6 +15,17 @@ pub enum Commands {
     /// Generate test wallets for development
     GenerateWallets {
         /// Number of wallets to generate
+        count: usize,
+    },
+    
+    /// Check wallet funding status
+    CheckFunding {
+        /// Master seed for wallet generation
+        #[arg(short, long)]
+        seed: String,
+        
+        /// Number of wallets to check
+        #[arg(short, long, default_value = "10")]
         count: usize,
     },
 }

@@ -1,0 +1,29 @@
+{
+  "file_hash": "c2b41a12cf0052bb52d7eca1fffb37783b01abf304d2d4d4e2824e6a1c3ae3a9",
+  "master_integrity": "9256dad7400a7366ba6cf3d4f90d5f4d575f617ddff7eea0634dccd98630ae79",
+  "total_chunks": 1,
+  "chunk_size_range": [
+    16,
+    48
+  ],
+  "retrieval_map": [
+    {
+      "tx_hash": "0x0000000000000000000000000000000000000000000000008e1058c0fc4d2869",
+      "wallet_address": "0xcca8baa9421328ebb8e5eae2e0b144b3fe10ed1a",
+      "steganographic_key": "1d02a6f09d27594a81e22de8436b9c50",
+      "chunk_metadata": {
+        "chunk_id": 0,
+        "sequence_hint": 17560910987544847833,
+        "checksum": "c2b41a12",
+        "integrity_proof": "94360903867d6d48"
+      }
+    }
+  ],
+  "decoy_transactions": [],
+  "network_info": {
+    "chain_id": 137,
+    "rpc_url": "placeholder",
+    "block_number": 76260006,
+    "timestamp": 1757450797
+  }
+}
