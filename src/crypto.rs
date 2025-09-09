@@ -5,6 +5,7 @@ use hmac::{Hmac, Mac};
 use rand::{SeedableRng, Rng};
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
+use tracing::debug;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -43,8 +44,19 @@ impl CryptoEngine {
         // Encrypt file
         let cipher = Aes256Gcm::new(&encryption_key);
         let nonce = Aes256Gcm::generate_nonce(&mut rand::thread_rng());
-        let encrypted_data = cipher.encrypt(&nonce, file_data)
+        let ciphertext = cipher.encrypt(&nonce, file_data)
             .map_err(|e| anyhow!("Encryption failed: {}", e))?;
+        
+        debug!("Encrypt: master_seed: {}", hex::encode(&self.master_seed));
+        debug!("Encrypt: passphrase: {}", passphrase);
+        debug!("Encrypt: encryption_key: {}", hex::encode(&encryption_key));
+        debug!("Encrypt: nonce: {}", hex::encode(&nonce));
+        debug!("Encrypt: ciphertext: {}", hex::encode(&ciphertext));
+        
+        // Combine nonce + ciphertext for storage
+        let mut encrypted_data = nonce.to_vec();
+        encrypted_data.extend_from_slice(&ciphertext);
+        debug!("Encrypt: combined encrypted_data: {}", hex::encode(&encrypted_data));
         
         // Variable-size chunking for obfuscation
         let chunks = self.create_variable_chunks(&encrypted_data, &integrity_key, passphrase, master_integrity)?;
@@ -56,6 +68,12 @@ impl CryptoEngine {
         let (encryption_key, _) = self.derive_keys(passphrase);
         let cipher = Aes256Gcm::new(&encryption_key);
         
+        debug!("Decrypt: master_seed: {}", hex::encode(&self.master_seed));
+        debug!("Decrypt: passphrase: {}", passphrase);
+        debug!("Decrypt: encryption_key: {}", hex::encode(&encryption_key));
+        debug!("Decrypt: encrypted_data length: {}", encrypted_data.len());
+        debug!("Decrypt: encrypted_data: {}", hex::encode(encrypted_data));
+        
         // For simplicity, we'll extract nonce from the first 12 bytes of encrypted data
         if encrypted_data.len() < 12 {
             return Err(anyhow!("Encrypted data too short"));
@@ -63,6 +81,9 @@ impl CryptoEngine {
         
         let nonce = Nonce::from_slice(&encrypted_data[..12]);
         let ciphertext = &encrypted_data[12..];
+        
+        debug!("Decrypt: nonce: {}", hex::encode(nonce));
+        debug!("Decrypt: ciphertext: {}", hex::encode(ciphertext));
         
         let decrypted = cipher.decrypt(nonce, ciphertext)
             .map_err(|e| anyhow!("Decryption failed: {}", e))?;

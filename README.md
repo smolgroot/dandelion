@@ -1,4 +1,4 @@
-# 🌻 Dandelion
+#  Dandelion
 
 **Steganographic File Distributor for Ethereum/EVM Networks**
 

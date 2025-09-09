@@ -7,6 +7,7 @@ pub struct DandelionConfig {
     pub network: NetworkConfig,
     pub security: SecurityConfig,
     pub performance: PerformanceConfig,
+    pub logging: LoggingConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +34,11 @@ pub struct PerformanceConfig {
     pub retry_delay_ms: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoggingConfig {
+    pub log_level: String,
+}
+
 impl Default for DandelionConfig {
     fn default() -> Self {
         Self {
@@ -53,6 +59,9 @@ impl Default for DandelionConfig {
                 max_concurrent_transactions: 5,
                 retry_attempts: 3,
                 retry_delay_ms: 1000,
+            },
+            logging: LoggingConfig {
+                log_level: "info".to_string(),
             },
         }
     }
@@ -83,7 +92,7 @@ impl DandelionConfig {
         let config = Self::default();
         config.save_to_file("dandelion.toml")?;
         
-        println!("🌻 Dandelion configuration initialized!");
+        println!("Dandelion configuration initialized!");
         println!("📁 Config file created: dandelion.toml");
         println!("🌐 Default network: {} (Chain ID: {})", 
             config.network.network_name, config.network.chain_id);

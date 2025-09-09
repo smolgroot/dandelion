@@ -1,6 +1,25 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+#[derive(Parser)]
+#[command(about = "A steganographic file distributor for Ethereum/EVM networks")]
+pub struct Cli {
+    /// Enable verbose logging
+    #[arg(short, long)]
+    pub verbose: bool,
+    
+    /// RPC endpoint URL (e.g., https://polygon-rpc.com)
+    #[arg(short, long)]
+    pub rpc_url: Option<String>,
+    
+    /// Network chain ID (137 for Polygon, 8453 for Base)
+    #[arg(short, long, default_value = "137")]
+    pub chain_id: u64,
+    
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize configuration file
@@ -14,6 +33,10 @@ pub enum Commands {
     
     /// Generate test wallets for development
     GenerateWallets {
+        /// Master seed for wallet generation
+        #[arg(short, long)]
+        seed: String,
+        
         /// Number of wallets to generate
         count: usize,
     },
@@ -27,6 +50,35 @@ pub enum Commands {
         /// Number of wallets to check
         #[arg(short, long, default_value = "10")]
         count: usize,
+    },
+    
+    /// Generate master wallet address for funding
+    MasterWallet {
+        /// Master seed for wallet generation
+        #[arg(short, long)]
+        seed: String,
+    },
+    
+    /// Fund derived wallets from master wallet
+    FundWallets {
+        /// Master seed for wallet generation
+        #[arg(short, long)]
+        seed: String,
+        
+        /// Number of wallets to fund
+        #[arg(short, long, default_value = "10")]
+        count: usize,
+        
+        /// Amount to fund each wallet (in ETH)
+        #[arg(short, long, default_value = "0.005")]
+        amount: f64,
+    },
+    
+    /// Check master wallet balance
+    CheckMaster {
+        /// Master seed for wallet generation
+        #[arg(short, long)]
+        seed: String,
     },
 }
 
@@ -59,6 +111,18 @@ pub struct DistributeArgs {
     /// Number of decoy wallets
     #[arg(long, default_value = "20")]
     pub decoy_wallets: usize,
+    
+    /// Number of wallets to use for distribution (fixed for consistency)
+    #[arg(long, default_value = "10")]
+    pub wallet_count: usize,
+    
+    /// Auto-fund derived wallets from master wallet
+    #[arg(long, default_value_t = true)]
+    pub auto_fund: bool,
+    
+    /// Amount to fund each derived wallet (in ETH)
+    #[arg(long, default_value = "0.005")]
+    pub fund_amount: f64,
 }
 
 #[derive(Parser)]
